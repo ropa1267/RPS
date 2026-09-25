@@ -90,7 +90,7 @@
             visibility: hidden;
         }
 
-        /* ПОДСВЕТКА ЗА КУРСОРОМ (По умолчанию скрыта для мобилок) */
+        /* ПОДСВЕТКА ЗА КУРСОРОМ */
         .cursor-light {
             display: none;
             position: fixed;
@@ -105,45 +105,21 @@
             transition: width 0.3s, height 0.3s;
         }
 
-        /* Подсветка отображается ТОЛЬКО на устройствах с мышкой/курсором */
         hover: hover and (pointer: fine) {
             .cursor-light {
                 display: block;
             }
         }
 
-        /* ПЛАВНЫЙ ЗВЁЗДНЫЙ ФОН С МЕРЦАНИЕМ */
-        .stars {
+        /* ХОЛСТ СО ЗВЁЗДАМИ */
+        #starsCanvas {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             pointer-events: none;
-            background-image: 
-                radial-gradient(2px 2px at 20px 30px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(2px 2px at 40px 70px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 90px 40px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(2px 2px at 160px 120px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(1.5px 1.5px at 230px 200px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(2px 2px at 300px 80px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(1px 1px at 350px 250px, #ffffff, rgba(0,0,0,0)),
-                radial-gradient(2px 2px at 450px 150px, #ffffff, rgba(0,0,0,0));
-            background-repeat: repeat;
-            background-size: 500px 500px;
-            animation: moveStars 20s linear infinite, starTwinkle 3s ease-in-out infinite alternate;
             z-index: 1;
-        }
-
-        @keyframes moveStars {
-            from { transform: translateY(0); }
-            to { transform: translateY(-500px); }
-        }
-
-        @keyframes starTwinkle {
-            0% { opacity: 0.1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 0.3; }
         }
 
         /* ОСНОВНОЙ КОНТЕНТ */
@@ -167,8 +143,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        header {
-            text-align: center;
+        header {text-align: center;
             margin-bottom: 25px;
             animation: fadeInDown 0.8s ease forwards;
         }
@@ -261,14 +236,14 @@
                 </stop>
             </linearGradient>
         </defs>
-        <rect class="frame-rect" x="2" y="2" width="100%" height="100%" rx="24"/>
+        <rect class="frame-rect" x="4" y="4" width="calc(100% - 8px)" height="calc(100% - 8px)" rx="24"/>
     </svg>
 
     <!-- Подсветка за курсором -->
     <div class="cursor-light" id="cursorLight"></div>
 
-    <!-- Звёздный фон -->
-    <div class="stars"></div>
+    <!-- Холст для звёзд -->
+    <canvas id="starsCanvas"></canvas>
 
     <div class="container">
         <header>
@@ -308,6 +283,90 @@
             cursorLight.style.left = `${e.clientX}px`;
             cursorLight.style.top = `${e.clientY}px`;
         });
+
+        // РЕНДЕР ЗВЁЗД НА CANVAS (С ОБРЕЗКОЙ ПО ВНУТРЕННЕЙ ГРАНИЦЕ РАМКИ)
+        const canvas = document.getElementById('starsCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let stars = [];
+        const numStars = 70;
+        const padding = 12; // Отступ внутренней границы обрезки рамки
+        const borderRadius = 22; // Скругление области обрезки
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Star {
+            constructor() {
+                this.reset(true);
+            }
+
+            reset(initial = false) {
+                this.x = Math.random() * canvas.width;
+                this.y = initial ? Math.random() * canvas.height : canvas.height - padding;
+                this.size = Math.random() * 1.8 + 0.5;
+                this.speed = Math.random() * 0.6 + 0.2;
+                this.alpha = Math.random() * 0.7 + 0.2;
+                this.alphaSpeed = Math.random() * 0.015 + 0.005;
+                this.alphaDir = Math.random() > 0.5 ? 1 : -1;
+            }
+
+            update() {
+                this.y -= this.speed;
+                this.alpha += this.alphaSpeed * this.alphaDir;
+
+                if (this.alpha >= 0.9 || this.alpha <= 0.2) {
+                    this.alphaDir *= -1;
+                }
+
+                if (this.y < padding) {
+                    this.reset(false);
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < numStars; i++) {
+            stars.push(new Star());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Создаем контур обрезки внутри рамки
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(
+                padding, 
+                padding, 
+                canvas.width - padding * 2, 
+                canvas.height - padding * 2, 
+                borderRadius
+            );
+            ctx.clip(); // Вся графика отрисовывается ТОЛЬКО внутри этой области
+
+            // Отрисовка звёзд
+            stars.forEach(star => {
+                star.update();
+                star.draw();
+            });
+
+            ctx.restore();
+            requestAnimationFrame(animate);
+        }
+
+        animate();
     </script>
 </body>
 </html>
